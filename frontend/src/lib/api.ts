@@ -7,8 +7,12 @@ const TOKEN_KEY = "cb_token";
 // On hosting, set VITE_API_URL at build time, e.g. https://campblazer-api.onrender.com
 export const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
 
-/** Uploaded files (/media/...) live on the API server, not on the frontend host. */
+/** Resolve destination photos from the static frontend on Render, not ephemeral API media storage. */
 export function mediaUrl(src: string): string {
+  const destinationPhoto = src.match(/^\/media\/destinations\/([^/?#]+)([?#].*)?$/);
+  if (API_ORIGIN && destinationPhoto) {
+    return `/photos/${destinationPhoto[1]}${destinationPhoto[2] ?? ""}`;
+  }
   return src.startsWith("/media/") ? `${API_ORIGIN}${src}` : src;
 }
 
@@ -47,13 +51,29 @@ export class ApiError extends Error {
   }
 }
 
+async function responseData(res: Response): Promise<unknown> {
+  if (res.status === 204) return undefined;
+
+  const contentType = res.headers.get("content-type") ?? "";
+  const mediaType = contentType.split(";", 1)[0].trim().toLowerCase();
+  if (mediaType !== "application/json" && !mediaType.endsWith("+json")) {
+    throw new Error(`Expected a JSON API response, received ${contentType || "no content type"} (HTTP ${res.status}). Check that the API URL targets the Django service.`);
+  }
+
+  try {
+    return await res.json();
+  } catch {
+    throw new Error(`The API returned invalid JSON (HTTP ${res.status}). Check that the API URL targets the Django service.`);
+  }
+}
+
 export interface ApiMeta { workerPid?: string; serverMs?: string; clientMs: number }
 
 /** multipart/form-data upload (photo files). */
 export async function upload<T>(path: string, form: FormData): Promise<T> {
   const token = getToken();
   const res = await fetch(`${API_ORIGIN}/api${path}`, { method: "POST", headers: token ? { Authorization: `Token ${token}` } : {}, body: form });
-  const data = await res.json().catch(() => ({}));
+  const data = await responseData(res);
   if (!res.ok) throw new ApiError(res.status, data);
   return data as T;
 }
@@ -74,8 +94,7 @@ export async function api<T>(path: string, opts: { method?: string; body?: unkno
     serverMs: res.headers.get("X-Processing-Time-ms") ?? undefined,
     clientMs: Math.round(performance.now() - t0),
   });
-  if (res.status === 204) return undefined as T;
-  const data = await res.json().catch(() => ({}));
+  const data = await responseData(res);
   if (!res.ok) throw new ApiError(res.status, data);
   return data as T;
 }

@@ -13,6 +13,30 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null);
 
+const userRoles = new Set(["CAMPER", "VENUE_OPERATOR", "GUIDE", "ADMIN"]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isUser(value: unknown): value is User {
+  return isRecord(value)
+    && typeof value.id === "number"
+    && typeof value.username === "string"
+    && typeof value.email === "string"
+    && typeof value.first_name === "string"
+    && typeof value.last_name === "string"
+    && typeof value.role === "string"
+    && userRoles.has(value.role);
+}
+
+function parseAuthResponse(value: unknown, action: string): { token: string; user: User } {
+  if (!isRecord(value) || typeof value.token !== "string" || !isUser(value.user)) {
+    throw new Error(`${action} received an unexpected response. Confirm that the API URL targets Django and rebuild the frontend.`);
+  }
+  return { token: value.token, user: value.user };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
@@ -26,11 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => { refresh().finally(() => setReady(true)); }, [refresh]);
 
   const login = async (username: string, password: string) => {
-    const r = await api<{ token: string; user: User }>("/auth/login/", { method: "POST", body: { username, password } });
+    const r = parseAuthResponse(await api<unknown>("/auth/login/", { method: "POST", body: { username, password } }), "Login");
     setToken(r.token); setUser(r.user); return r.user;
   };
   const register = async (data: Record<string, string>) => {
-    const r = await api<{ token: string; user: User }>("/auth/register/", { method: "POST", body: data });
+    const r = parseAuthResponse(await api<unknown>("/auth/register/", { method: "POST", body: data }), "Registration");
     setToken(r.token); setUser(r.user); return r.user;
   };
   const logout = async () => {
