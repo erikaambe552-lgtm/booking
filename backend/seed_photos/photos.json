@@ -1,0 +1,23 @@
+{
+  "_note": "Photo -> destination mapping used by `manage.py seed_photos --reset`. Order follows the approved list (pics 1-13 sent on Nov 19 + 5 earlier photos). Credits come from the visible watermark; 'Source to be confirmed' means there was none. All are permission pending.",
+  "photos": [
+    {"file": "vrc-beach-resort.jpg", "destination": "VRC Beach Resort", "caption": "VRC Resort entrance stairway", "credit": "BiliranIsland.com", "cover": true},
+    {"file": "paradizu-bayview-resort.jpg", "destination": "Paradizu Bayview Resort", "caption": "Welcome sign at Paradizu Bayview Resort", "credit": "BiliranIsland.com", "cover": true},
+    {"file": "coco-grove-beach-resort.jpg", "destination": "Coco Grove Beach Resort", "caption": "Shaded sandy beach at Coco Grove", "credit": "© BiliranIsland.com", "cover": true},
+    {"file": "agta-beach-resort.jpg", "destination": "Agta Beach Resort", "caption": "Beachfront cottages at Agta Beach Resort", "credit": "Source to be confirmed (supplied by CampBlazer team)", "cover": true},
+    {"file": "higatangan-island.jpg", "destination": "Higatangan Island", "caption": "Higatangan Island's white sandbar", "credit": "Source to be confirmed (supplied by CampBlazer team)", "cover": true},
+    {"file": "dalutan-island.jpg", "destination": "Dalutan Island", "caption": "Aerial view of Dalutan's white beach", "credit": "BiliranIsland.com", "cover": true},
+    {"file": "chamorita-beach-resort.jpg", "destination": "Chamorita Beach Resort", "caption": "Family pool and octopus slide at Chamorita", "credit": "Source to be confirmed (supplied by CampBlazer team)", "cover": true},
+    {"file": "napo-beach-resort.jpg", "destination": "Napo Beach Resort", "caption": "Aerial view of Napo Beach Resort", "credit": "Source to be confirmed (supplied by CampBlazer team)", "cover": true},
+    {"file": "agpangi-brown-beach.jpg", "destination": "Agpangi Brown Beach", "caption": "Agpangi brown-sand beach", "credit": "© BiliranIsland.com", "cover": true},
+    {"file": "cogon-beach-resort.jpg", "destination": "Cogon Beach Resort", "caption": "Cogon Beach Resort", "credit": "Source to be confirmed (supplied by CampBlazer team)", "cover": true},
+    {"file": "alegre-beach-resort.jpg", "destination": "Alegre Beach Resort", "caption": "Alegre Beach Resort", "credit": "'Love the Philippines' graphic — photographer to be confirmed", "cover": true},
+    {"file": "francis-place.jpg", "destination": "Francis' Place", "caption": "Francis' Place", "credit": "'Love the Philippines' graphic — photographer to be confirmed", "cover": true},
+    {"file": "mount-tres-marias.jpg", "destination": "Mount Tres Marias", "caption": "The three peaks of Tres Marias, Almeria", "credit": "Source to be confirmed (supplied by CampBlazer team)", "cover": true},
+    {"file": "mount-panamao.jpg", "destination": "Mount Panamao", "caption": "Grassland below Mount Panamao", "credit": "Source to be confirmed (supplied by CampBlazer team)", "cover": true},
+    {"file": "mount-suiro-ascuero.jpg", "destination": "Mount Suiro (Ascuero)", "caption": "Mount Suiro above the rice fields", "credit": "BiliranIsland.com", "cover": true},
+    {"file": "mount-naliwatan.jpg", "destination": "Mount Naliwatan", "caption": "Summit marker — Mt. Naliwatan, 1,314 masl", "credit": "Source to be confirmed (supplied by CampBlazer team)", "cover": true},
+    {"file": "mount-sayoa.jpg", "destination": "Mount Sayoa", "caption": "Mount Sayoa above the rice terraces", "credit": "BiliranIsland.com", "cover": true},
+    {"file": "camp-beben.jpg", "destination": "Camp Beben", "caption": "Tents at night below the mountain", "credit": "Source to be confirmed (supplied by CampBlazer team)", "cover": true}
+  ]
+}
