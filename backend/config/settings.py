@@ -21,9 +21,6 @@ ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
 RAILWAY_PUBLIC_DOMAIN = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
 if RAILWAY_PUBLIC_DOMAIN and RAILWAY_PUBLIC_DOMAIN not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
-RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
-if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 INSTALLED_APPS = [
     "core.apps.CoreConfig",  # provides the multi-worker runserver management command
@@ -79,7 +76,7 @@ ASGI_APPLICATION = "config.asgi.application"
 # Real-time layer: Django Channels + Redis.
 # Every server worker process subscribes to Redis, so an event published by the
 # worker that handled an approval reaches a WebSocket held open by ANY worker.
-REDIS_URL = os.getenv("REDIS_URL") or os.getenv("RAILWAY_REDIS_URL", "")
+REDIS_URL = os.getenv("REDIS_URL", "")
 if REDIS_URL:
     CHANNEL_LAYERS = {"default": {"BACKEND": "channels_redis.core.RedisChannelLayer",
                                   "CONFIG": {"hosts": [{"address": REDIS_URL, "protocol": 2}]}}}
@@ -166,7 +163,6 @@ CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
 for origin in [
     FRONTEND_URL,
     f"https://{RAILWAY_PUBLIC_DOMAIN}" if RAILWAY_PUBLIC_DOMAIN else "",
-    f"https://{RENDER_EXTERNAL_HOSTNAME}" if RENDER_EXTERNAL_HOSTNAME else "",
 ]:
     if origin and origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(origin)

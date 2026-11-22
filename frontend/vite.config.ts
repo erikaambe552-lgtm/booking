@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     port: 5173,
     // Allow public tunnel addresses (Cloudflare Quick Tunnel) to reach the dev server.
-    allowedHosts: [".trycloudflare.com", ".app.github.dev", ".railway.app"],
+    allowedHosts: [".trycloudflare.com", ".app.github.dev"],
     proxy: {
       "/api": { target: "http://127.0.0.1:8000", changeOrigin: true },
       "/media": { target: "http://127.0.0.1:8000", changeOrigin: true },
@@ -16,7 +16,7 @@ export default defineConfig({
   },
   preview: {
     port: 4173,
-    allowedHosts: [".trycloudflare.com", ".app.github.dev", ".railway.app"],
+    allowedHosts: [".trycloudflare.com", ".app.github.dev", ".up.railway.app"],
     proxy: {
       "/api": { target: "http://127.0.0.1:8000", changeOrigin: true },
       "/media": { target: "http://127.0.0.1:8000", changeOrigin: true },
