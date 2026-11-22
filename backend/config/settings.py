@@ -18,9 +18,9 @@ if not SECRET_KEY:
 
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
-render_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME")
-if render_hostname and render_hostname not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append(render_hostname)
+railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
+if railway_domain:
+    ALLOWED_HOSTS.append(railway_domain)
 
 INSTALLED_APPS = [
     "core.apps.CoreConfig",  # provides the multi-worker runserver management command
@@ -76,7 +76,7 @@ ASGI_APPLICATION = "config.asgi.application"
 # Real-time layer: Django Channels + Redis.
 # Every server worker process subscribes to Redis, so an event published by the
 # worker that handled an approval reaches a WebSocket held open by ANY worker.
-REDIS_URL = os.getenv("REDIS_URL", "")
+REDIS_URL = os.getenv("REDIS_URL") or os.getenv("RAILWAY_REDIS_URL", "")
 if REDIS_URL:
     CHANNEL_LAYERS = {"default": {"BACKEND": "channels_redis.core.RedisChannelLayer",
                                   "CONFIG": {"hosts": [{"address": REDIS_URL, "protocol": 2}]}}}
@@ -86,29 +86,21 @@ else:
 
 RUNSERVER_WORKERS = int(os.getenv("DJANGO_RUNSERVER_WORKERS", "4"))
 
-DATABASE_URL = os.getenv("DATABASE_URL", "")
-if DATABASE_URL:
-    import dj_database_url
-
-    DATABASES = {
-        "default": dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
+DATABASE_PATH_VALUE = os.getenv("DATABASE_PATH", "").strip()
+DATABASE_PATH = Path(DATABASE_PATH_VALUE) if DATABASE_PATH_VALUE else BASE_DIR / "db.sqlite3"
+DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": DATABASE_PATH,
+        "TEST": {"NAME": BASE_DIR / "test_db.sqlite3"},
+        "OPTIONS": {
+            "timeout": int(os.getenv("SQLITE_TIMEOUT", "20")),
+            "transaction_mode": "IMMEDIATE",
+        },
     }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-            "TEST": {"NAME": BASE_DIR / "test_db.sqlite3"},
-            "OPTIONS": {
-                "timeout": int(os.getenv("SQLITE_TIMEOUT", "20")),
-                "transaction_mode": "IMMEDIATE",
-            },
-        }
-    }
+}
+# ASGI workers can process requests concurrently; SQLite still serializes writes.
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -125,17 +117,14 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
-STATICFILES_DIRS = [FRONTEND_DIST] if FRONTEND_DIST.is_dir() else []
-FRONTEND_INDEX = STATIC_ROOT / "index.html"
-if not FRONTEND_INDEX.exists() and (FRONTEND_DIST / "index.html").exists():
-    FRONTEND_INDEX = FRONTEND_DIST / "index.html"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 MEDIA_URL = "/media/"
-MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", str(BASE_DIR / "media")))
+MEDIA_ROOT_VALUE = os.getenv("MEDIA_ROOT", "").strip()
+MEDIA_ROOT = Path(MEDIA_ROOT_VALUE) if MEDIA_ROOT_VALUE else BASE_DIR / "media"
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -156,15 +145,19 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
 # Django admin login over HTTPS on a hosted domain, e.g. https://campblazer-api.onrender.com
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
-if render_hostname:
-    render_origin = f"https://{render_hostname}"
-    if render_origin not in CSRF_TRUSTED_ORIGINS:
-        CSRF_TRUSTED_ORIGINS.append(render_origin)
+frontend_url = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+if frontend_url:
+    CORS_ALLOWED_ORIGINS.append(frontend_url)
+    CSRF_TRUSTED_ORIGINS.append(frontend_url)
 # Origins allowed to open the WebSocket: the server's own hosts + the frontend's address(es).
-WS_ALLOWED_ORIGINS = ALLOWED_HOSTS + CORS_ALLOWED_ORIGINS
+WS_ALLOWED_ORIGINS = list(dict.fromkeys(
+    CORS_ALLOWED_ORIGINS
+    + [f"http://{host}" for host in ALLOWED_HOSTS if "." not in host or host in ("localhost", "127.0.0.1")]
+    + [f"https://{host}" for host in ALLOWED_HOSTS if "." in host]
+    + ([f"https://{railway_domain}", f"http://{railway_domain}"] if railway_domain else [])
+))
 # Behind a hosting proxy (Render, Railway...) the original scheme arrives in this header.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SECURE_SSL_REDIRECT = not DEBUG
 
 # Security headers (cookies become Secure automatically when DEBUG is off).
 SESSION_COOKIE_HTTPONLY = True

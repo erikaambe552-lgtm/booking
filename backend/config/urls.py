@@ -6,7 +6,6 @@ from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import include, path, re_path
 from django.views.static import serve
-from django.http import FileResponse, Http404
 
 urlpatterns = [
     path("django-admin/", admin.site.urls),
@@ -18,20 +17,5 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += staticfiles_urlpatterns()
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-elif os.getenv("SERVE_MEDIA") == "1":
+elif os.getenv("SERVE_MEDIA", "1" if os.getenv("RAILWAY_ENVIRONMENT") else "0") == "1":
     urlpatterns += [re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT})]
-
-
-def serve_frontend(request, path=""):
-    index = settings.FRONTEND_INDEX
-    if not index.exists():
-        raise Http404("Frontend build not found.")
-    return FileResponse(index.open("rb"), content_type="text/html")
-
-
-# Serve the Vite SPA from Django/WhiteNoise on Render. API and Django Admin routes
-# are matched above this final catch-all.
-urlpatterns += [
-    re_path(r"^(?!api(?:/|$)|django-admin(?:/|$)|media(?:/|$)|static(?:/|$)|assets(?:/|$)).*$",
-            serve_frontend),
-]
