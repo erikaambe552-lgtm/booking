@@ -1,66 +1,45 @@
-# Render Blueprint: Dashboard -> New -> Blueprint -> pick this GitHub repo.
-# Creates 3 free services. PostgreSQL comes from Neon (free, does not expire);
-# paste its DIRECT connection string into DATABASE_URL when Render asks.
 services:
-  # Django REST API + WebSockets
-  - type: web
-    name: campblazer-api
-    runtime: python
+  - type: keyvalue
+    name: campblazer-redis
     plan: free
-    region: singapore
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    startCommand: bash render-start.sh
+    ipAllowList: []
+
+  - type: web
+    name: campblazer
+    runtime: python
+    plan: starter
+    rootDir: .
+    buildCommand: cd frontend && npm ci && npm run build && cd ../backend && pip install -r requirements.txt && python manage.py collectstatic --noinput
+    preDeployCommand: cd backend && python manage.py migrate --noinput
+    startCommand: cd backend && gunicorn config.asgi:application -k uvicorn_worker.UvicornWorker --workers 4 --bind 0.0.0.0:$PORT --worker-tmp-dir /dev/shm --timeout 120 --graceful-timeout 30 --keep-alive 5
     healthCheckPath: /api/system/info/
+    disk:
+      name: campblazer-media
+      mountPath: /var/data/campblazer
+      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
-        value: "3.12.7"
+        value: 3.12.1
       - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DJANGO_DEBUG
         value: "False"
-      - key: DJANGO_ALLOWED_HOSTS
-        value: ".onrender.com"
-      - key: DATABASE_URL            # Neon direct connection string (postgresql://...sslmode=require)
-        sync: false
+      - key: DJANGO_RUNSERVER_WORKERS
+        value: "4"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: campblazer-db
+          property: connectionString
       - key: REDIS_URL
         fromService:
-          type: keyvalue
           name: campblazer-redis
+          type: keyvalue
           property: connectionString
-      - key: CORS_ALLOWED_ORIGINS    # the frontend address, e.g. https://campblazer.onrender.com
-        sync: false
-      - key: CSRF_TRUSTED_ORIGINS    # the API address, e.g. https://campblazer-api.onrender.com
-        sync: false
-      - key: PHOTO_BASE_URL          # the frontend address again (photos are served by the frontend)
-        sync: false
-      - key: DEMO_PASSWORD           # password for admin_demo / operator_demo / campers (see Environment tab)
-        generateValue: true
-      - key: GUNICORN_WORKERS        # free instance has 512 MB RAM: 2 workers fit
-        value: "2"
+      - key: MEDIA_ROOT
+        value: /var/data/campblazer/media
+      - key: SERVE_MEDIA
+        value: "1"
 
-  # React + TypeScript frontend (static site, served from a CDN)
-  - type: web
-    name: campblazer
-    runtime: static
-    buildFilter:
-      paths:
-        - frontend/**
-        - backend/seed_photos/**
-    buildCommand: mkdir -p frontend/public/photos && cp backend/seed_photos/*.jpg frontend/public/photos/ && cd frontend && npm ci && npm run build
-    staticPublishPath: frontend/dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_URL            # the API address, e.g. https://campblazer-api.onrender.com
-        sync: false
-
-  # Redis (Render Key Value) for the Channels layer: carries live events between workers
-  - type: keyvalue
-    name: campblazer-redis
+databases:
+  - name: campblazer-db
     plan: free
-    region: singapore
-    ipAllowList: []                  # internal only: reachable just from campblazer-api
-    maxmemoryPolicy: noeviction

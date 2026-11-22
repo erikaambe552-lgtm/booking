@@ -7,12 +7,8 @@ const TOKEN_KEY = "cb_token";
 // On hosting, set VITE_API_URL at build time, e.g. https://campblazer-api.onrender.com
 export const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
 
-/** Resolve destination photos from the static frontend on Render, not ephemeral API media storage. */
+/** Keep uploaded media on the Django origin when the API is hosted separately. */
 export function mediaUrl(src: string): string {
-  const destinationPhoto = src.match(/^\/media\/destinations\/([^/?#]+)([?#].*)?$/);
-  if (API_ORIGIN && destinationPhoto) {
-    return `/photos/${destinationPhoto[1]}${destinationPhoto[2] ?? ""}`;
-  }
   return src.startsWith("/media/") ? `${API_ORIGIN}${src}` : src;
 }
 

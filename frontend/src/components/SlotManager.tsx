@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { dateOnly, timeRange } from "../lib/format";
 import { useApi } from "../lib/useApi";
 import type { Slot } from "../lib/types";
+import { useLiveEvent, useLivePolling } from "../lib/realtime";
 
 interface Services { venues: { id: number; name: string; destination: string }[]; guides: { id: number; name: string; destination: string }[] }
 
@@ -14,6 +15,13 @@ export function SlotManager() {
   const guideScheds = useApi<Slot[]>("/operator/guide-schedules/");
   const [f, setF] = useState({ target: "", date: "", start: "08:00", end: "20:00", meeting_point: "", note: "" });
   const [msg, setMsg] = useState("");
+  useLiveEvent(["availability.changed", "admin.data.changed", "reservation.new", "reservation.status"], (e) => {
+    if (e.type === "availability.changed" || e.type === "reservation.new" || e.type === "reservation.status" ||
+        (e.type === "admin.data.changed" && (e.entity === "availability" || e.entity === "services"))) {
+      svc.reload(); venueSlots.reload(); guideScheds.reload();
+    }
+  });
+  useLivePolling(() => { svc.reload(); venueSlots.reload(); guideScheds.reload(); });
 
   const options = [
     ...(svc.data?.venues ?? []).map((v) => ({ key: `v-${v.id}`, label: `Venue · ${v.name} (${v.destination})` })),

@@ -108,6 +108,16 @@ export function useLiveEvent(types: string[], fn: (e: LiveEvent) => void) {
   useEffect(() => subscribe((e) => { if (key.split(",").includes(e.type)) ref.current(e); }), [subscribe, key]);
 }
 
+/** Short fallback refresh for deployments whose channel layer is temporarily unavailable. */
+export function useLivePolling(fn: () => void, intervalMs = 5000) {
+  const ref = useRef(fn);
+  ref.current = fn;
+  useEffect(() => {
+    const timer = window.setInterval(() => ref.current(), intervalMs);
+    return () => window.clearInterval(timer);
+  }, [intervalMs]);
+}
+
 export function Toaster() {
   const { toasts, dismiss } = useRealtime();
   return (

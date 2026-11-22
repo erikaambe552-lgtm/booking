@@ -2,7 +2,7 @@ import { Footer, Navbar, Splash } from "./components/Layout";
 import { Empty, Spinner } from "./components/Cards";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { RealtimeProvider, Toaster } from "./lib/realtime";
-import { useRoute } from "./lib/router";
+import { navigate, useRoute } from "./lib/router";
 import type { Role } from "./lib/types";
 import Home from "./pages/Home";
 import Explore from "./pages/Explore";
@@ -10,9 +10,10 @@ import Details from "./pages/Details";
 import HowItWorks from "./pages/HowItWorks";
 import { Login, Register } from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import UserHome from "./pages/UserHome";
 import Operator from "./pages/Operator";
 import Admin from "./pages/Admin";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 function Guard({ roles, children }: { roles?: Role[]; children: ReactNode }) {
   const { user, ready } = useAuth();
@@ -25,9 +26,23 @@ function Guard({ roles, children }: { roles?: Role[]; children: ReactNode }) {
 function Routes() {
   const route = useRoute();
   const { path } = route;
+  const { user, ready } = useAuth();
   let page: ReactNode;
+
+  useEffect(() => {
+    if (ready && user?.role === "ADMIN" && path !== "/admin") navigate("/admin");
+  }, [ready, user?.role, path]);
+
+  if (ready && user?.role === "ADMIN") {
+    if (path !== "/admin") return null;
+    return (
+      <main className="admin-app-shell fade-in"><Admin /></main>
+    );
+  }
+
   const detail = path.match(/^\/destinations\/([\w-]+)$/);
-  if (path === "/") page = <Home />;
+  if (path === "/" && ready && user?.role === "CAMPER") page = <Guard><UserHome /></Guard>;
+  else if (path === "/") page = <Home />;
   else if (path === "/explore") page = <Explore route={route} />;
   else if (detail) page = <Details slug={detail[1]} route={route} />;
   else if (path === "/how-it-works") page = <HowItWorks />;

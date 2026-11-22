@@ -36,13 +36,15 @@ export function Login({ route }: { route: Route }) {
 
 export function Register() {
   const { register } = useAuth();
-  const [v, setV] = useState<Record<string, string>>({ first_name: "", last_name: "", username: "", email: "", phone: "", password: "" });
+  const [v, setV] = useState<Record<string, string>>({
+    first_name: "", last_name: "", username: "", email: "", phone: "", password: "", role: "USER",
+  });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const set = (k: string) => (e: { target: { value: string } }) => setV({ ...v, [k]: e.target.value });
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setErr("");
-    try { await register(v); navigate("/dashboard"); }
+    try { const user = await register(v); navigate(home(user.role)); }
     catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
   };
   return (
@@ -50,7 +52,19 @@ export function Register() {
       <form className="auth-card" onSubmit={submit}>
         <LogoMark size={52} />
         <h1>Create your account</h1>
-        <p className="muted">Campers can register here. Operators and guides are set up by an administrator.</p>
+        <fieldset className="role-picker">
+          <legend>Account role</legend>
+          <div className="role-options">
+            <label className="role-option">
+              <input type="radio" name="role" value="USER" checked={v.role === "USER"} onChange={set("role")} />
+              <span>User</span>
+            </label>
+            <label className="role-option">
+              <input type="radio" name="role" value="ADMIN" checked={v.role === "ADMIN"} onChange={set("role")} />
+              <span>Admin</span>
+            </label>
+          </div>
+        </fieldset>
         <div className="grid-2">
           <label>First name<input required value={v.first_name} onChange={set("first_name")} /></label>
           <label>Last name<input required value={v.last_name} onChange={set("last_name")} /></label>

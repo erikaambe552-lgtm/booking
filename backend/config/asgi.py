@@ -1,9 +1,4 @@
-"""ASGI entry point: HTTP (Django + DRF) and WebSockets (Channels) in one app.
-
-    Linux/macOS/WSL : gunicorn -c gunicorn.conf.py config.asgi:application   (4 uvicorn worker processes)
-    Windows         : python run_server_windows.py --workers 4
-    Dev             : python manage.py runserver   (daphne, single process)
-"""
+"""ASGI entry point for HTTP (Django + DRF) and WebSockets (Channels)."""
 import os
 
 from django.core.asgi import get_asgi_application
@@ -13,9 +8,10 @@ django_asgi_app = get_asgi_application()  # must load before importing consumers
 
 from channels.routing import ProtocolTypeRouter, URLRouter  # noqa: E402
 from channels.security.websocket import OriginValidator  # noqa: E402
+from django.contrib.staticfiles.handlers import ASGIStaticFilesHandler  # noqa: E402
 from django.conf import settings  # noqa: E402
 
-from bookings.routing import websocket_urlpatterns  # noqa: E402
+from core.bookings.routing import websocket_urlpatterns  # noqa: E402
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
@@ -23,3 +19,6 @@ application = ProtocolTypeRouter({
     # frontend origins (CORS_ALLOWED_ORIGINS). Prevents cross-site WebSocket hijacking.
     "websocket": OriginValidator(URLRouter(websocket_urlpatterns), settings.WS_ALLOWED_ORIGINS),
 })
+
+if settings.DEBUG:
+    application = ASGIStaticFilesHandler(application)

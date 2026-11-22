@@ -18,8 +18,14 @@ export function Navbar({ path }: { path: string }) {
   useEffect(() => setOpen(false), [path]);
 
   const dash = user?.role === "ADMIN" ? "/admin" : user?.role === "VENUE_OPERATOR" || user?.role === "GUIDE" ? "/operator" : "/dashboard";
-  const links: [string, string][] = [["/", "Home"], ["/explore?category=BEACH", "Beaches"], ["/explore?category=MOUNTAIN", "Mountains"], ["/explore", "Explore"]];
-  const isActive = (to: string) => (to === "/" ? path === "/" : path === to.split("?")[0] && !to.includes("?")) ;
+  const links: [string, string][] = [["/", "Home"], ["/explore?category=BEACH", "Beaches"], ["/explore?category=MOUNTAIN", "Mountains"]];
+  const hashCategory = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("category");
+  const isActive = (to: string) => {
+    if (to === "/") return path === "/";
+    if (to.includes("category=BEACH")) return path === "/explore" && hashCategory === "BEACH";
+    if (to.includes("category=MOUNTAIN")) return path === "/explore" && hashCategory === "MOUNTAIN";
+    return false;
+  };
 
   return (
     <header className={`nav ${scrolled || path !== "/" ? "nav-solid" : ""}`}>

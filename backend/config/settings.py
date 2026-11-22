@@ -1,11 +1,4 @@
-"""
-CampBlazer Django settings.
-
-All secrets and credentials come from environment variables (.env file in
-development). PostgreSQL is required because the concurrency controls rely on
-row-level locking (SELECT ... FOR UPDATE), partial unique indexes and
-exclusion constraints.
-"""
+"""CampBlazer Django settings."""
 import os
 from pathlib import Path
 
@@ -25,29 +18,28 @@ if not SECRET_KEY:
 
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
+render_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if render_hostname and render_hostname not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(render_hostname)
 
 INSTALLED_APPS = [
-    "daphne",  # makes `manage.py runserver` serve ASGI (HTTP + WebSockets)
+    "core.apps.CoreConfig",  # provides the multi-worker runserver management command
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.contrib.postgres",
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
     "channels",
-    "accounts",
-    "destinations",
-    "bookings",
 ]
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -58,6 +50,8 @@ MIDDLEWARE = [
     # demo can show WHICH server process handled each request.
     "config.middleware.WorkerInfoMiddleware",
 ]
+if not DEBUG:
+    MIDDLEWARE.insert(2, "whitenoise.middleware.WhiteNoiseMiddleware")
 
 ROOT_URLCONF = "config.urls"
 
@@ -85,29 +79,34 @@ ASGI_APPLICATION = "config.asgi.application"
 REDIS_URL = os.getenv("REDIS_URL", "")
 if REDIS_URL:
     CHANNEL_LAYERS = {"default": {"BACKEND": "channels_redis.core.RedisChannelLayer",
-                                  "CONFIG": {"hosts": [REDIS_URL]}}}
+                                  "CONFIG": {"hosts": [{"address": REDIS_URL, "protocol": 2}]}}}
 else:
-    # Development fallback: works only with ONE server process (no cross-worker delivery).
+    # In-memory messages are local to a process and are not shared by multiple workers.
     CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+
+RUNSERVER_WORKERS = int(os.getenv("DJANGO_RUNSERVER_WORKERS", "4"))
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 if DATABASE_URL:
-    # Hosted Postgres (Neon, Render...) gives one connection string. Use the DIRECT
-    # (non "-pooler") Neon string: row locks need a normal session.
     import dj_database_url
 
-    DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=0, ssl_require=True)}
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
 else:
     DATABASES = {
         "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("POSTGRES_DB", "campblazer"),
-            "USER": os.getenv("POSTGRES_USER", "campblazer"),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
-            "HOST": os.getenv("POSTGRES_HOST", "127.0.0.1"),
-            "PORT": os.getenv("POSTGRES_PORT", "5432"),
-            "CONN_MAX_AGE": 0,  # ASGI: persistent connections are not safe across async threads
-            "OPTIONS": {"connect_timeout": 5},
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+            "TEST": {"NAME": BASE_DIR / "test_db.sqlite3"},
+            "OPTIONS": {
+                "timeout": int(os.getenv("SQLITE_TIMEOUT", "20")),
+                "transaction_mode": "IMMEDIATE",
+            },
         }
     }
 
@@ -126,12 +125,17 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
+STATICFILES_DIRS = [FRONTEND_DIST] if FRONTEND_DIST.is_dir() else []
+FRONTEND_INDEX = STATIC_ROOT / "index.html"
+if not FRONTEND_INDEX.exists() and (FRONTEND_DIST / "index.html").exists():
+    FRONTEND_INDEX = FRONTEND_DIST / "index.html"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", str(BASE_DIR / "media")))
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -152,10 +156,15 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
 # Django admin login over HTTPS on a hosted domain, e.g. https://campblazer-api.onrender.com
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
+if render_hostname:
+    render_origin = f"https://{render_hostname}"
+    if render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_origin)
 # Origins allowed to open the WebSocket: the server's own hosts + the frontend's address(es).
 WS_ALLOWED_ORIGINS = ALLOWED_HOSTS + CORS_ALLOWED_ORIGINS
 # Behind a hosting proxy (Render, Railway...) the original scheme arrives in this header.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = not DEBUG
 
 # Security headers (cookies become Secure automatically when DEBUG is off).
 SESSION_COOKIE_HTTPONLY = True
