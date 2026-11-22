@@ -18,9 +18,9 @@ if not SECRET_KEY:
 
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
-railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
-if railway_domain:
-    ALLOWED_HOSTS.append(railway_domain)
+RAILWAY_PUBLIC_DOMAIN = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
+if RAILWAY_PUBLIC_DOMAIN and RAILWAY_PUBLIC_DOMAIN not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
 
 INSTALLED_APPS = [
     "core.apps.CoreConfig",  # provides the multi-worker runserver management command
@@ -86,9 +86,16 @@ else:
 
 RUNSERVER_WORKERS = int(os.getenv("DJANGO_RUNSERVER_WORKERS", "4"))
 
+RAILWAY_VOLUME_MOUNT_PATH = os.getenv("RAILWAY_VOLUME_MOUNT_PATH", "").strip()
 DATABASE_PATH_VALUE = os.getenv("DATABASE_PATH", "").strip()
-DATABASE_PATH = Path(DATABASE_PATH_VALUE) if DATABASE_PATH_VALUE else BASE_DIR / "db.sqlite3"
+if DATABASE_PATH_VALUE:
+    DATABASE_PATH = Path(DATABASE_PATH_VALUE)
+elif RAILWAY_VOLUME_MOUNT_PATH:
+    DATABASE_PATH = Path(RAILWAY_VOLUME_MOUNT_PATH) / "db.sqlite3"
+else:
+    DATABASE_PATH = BASE_DIR / "db.sqlite3"
 DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -123,7 +130,12 @@ STORAGES = {
 }
 MEDIA_URL = "/media/"
 MEDIA_ROOT_VALUE = os.getenv("MEDIA_ROOT", "").strip()
-MEDIA_ROOT = Path(MEDIA_ROOT_VALUE) if MEDIA_ROOT_VALUE else BASE_DIR / "media"
+if MEDIA_ROOT_VALUE:
+    MEDIA_ROOT = Path(MEDIA_ROOT_VALUE)
+elif RAILWAY_VOLUME_MOUNT_PATH:
+    MEDIA_ROOT = Path(RAILWAY_VOLUME_MOUNT_PATH) / "media"
+else:
+    MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -143,18 +155,20 @@ REST_FRAMEWORK = {
 }
 
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+if FRONTEND_URL and FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
 # Django admin login over HTTPS on a hosted domain, e.g. https://campblazer-api.onrender.com
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
-frontend_url = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
-if frontend_url:
-    CORS_ALLOWED_ORIGINS.append(frontend_url)
-    CSRF_TRUSTED_ORIGINS.append(frontend_url)
+for origin in [FRONTEND_URL, f"https://{RAILWAY_PUBLIC_DOMAIN}" if RAILWAY_PUBLIC_DOMAIN else ""]:
+    if origin and origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
 # Origins allowed to open the WebSocket: the server's own hosts + the frontend's address(es).
+local_hosts = {"127.0.0.1", "localhost"}
 WS_ALLOWED_ORIGINS = list(dict.fromkeys(
     CORS_ALLOWED_ORIGINS
-    + [f"http://{host}" for host in ALLOWED_HOSTS if "." not in host or host in ("localhost", "127.0.0.1")]
-    + [f"https://{host}" for host in ALLOWED_HOSTS if "." in host]
-    + ([f"https://{railway_domain}", f"http://{railway_domain}"] if railway_domain else [])
+    + [f"http://{host}" for host in ALLOWED_HOSTS if host in local_hosts]
+    + [f"https://{host}" for host in ALLOWED_HOSTS if host not in local_hosts]
 ))
 # Behind a hosting proxy (Render, Railway...) the original scheme arrives in this header.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

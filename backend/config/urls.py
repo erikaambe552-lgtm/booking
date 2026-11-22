@@ -17,5 +17,5 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += staticfiles_urlpatterns()
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-elif os.getenv("SERVE_MEDIA", "1" if os.getenv("RAILWAY_ENVIRONMENT") else "0") == "1":
+elif os.getenv("SERVE_MEDIA") == "1":
     urlpatterns += [re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT})]
